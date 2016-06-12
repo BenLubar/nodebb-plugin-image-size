@@ -1,0 +1,13 @@
+{
+	"id": "nodebb-plugin-image-size",
+	"name": "Image Size",
+	"description": "Adds height and width attributes to posted images.",
+	"url": "https://github.com/BenLubar/nodebb-plugin-image-size",
+	"library": "./nodebb-plugin-image-size.js",
+	"hooks": [
+		{"hook": "static:app.load", "method": "load"},
+		{"hook": "filter:parse.post", "method": "parsePost", "priority": 15},
+		{"hook": "filter:parse.signature", "method": "parseSignature", "priority": 15},
+		{"hook": "filter:parse.aboutme", "method": "parseGeneric", "priority": 15}
+	]
+}

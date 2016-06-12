@@ -1,0 +1,22 @@
+{
+  "name": "nodebb-plugin-image-size",
+  "version": "0.0.1",
+  "description": "Adds height and width attributes to posted images.",
+  "main": "nodebb-plugin-image-size.js",
+  "scripts": {
+    "test": "go test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BenLubar/nodebb-plugin-image-size"
+  },
+  "author": "Ben Lubar <ben.lubar@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/BenLubar/nodebb-plugin-image-size/issues"
+  },
+  "homepage": "https://github.com/BenLubar/nodebb-plugin-image-size#readme",
+  "nbbpm": {
+    "compatibility": "^1.0.0"
+  }
+}
