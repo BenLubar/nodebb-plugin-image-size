@@ -24,10 +24,29 @@ var nconf = js.Module.Get("parent").Call("require", "nconf")
 var lru = ccache.New(ccache.Configure())
 var client = &http.Client{
 	Transport: func() http.RoundTripper {
-		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xmlhttprequest").Get("XMLHttpRequest"))
+		xhr := js.Global.Call("require", "xmlhttprequest").Get("XMLHttpRequest")
+		js.Global.Set("XMLHttpRequest", func() *js.Object {
+			// https://github.com/driverdan/node-XMLHttpRequest/issues/125
+			x := xhr.New()
+			inOpen := false
+			open := x.Get("open")
+			abort := x.Get("abort")
+			x.Set("open", func(method, url, async, user, password *js.Object) {
+				inOpen = true
+				open.Call("call", x, method, url, async, user, password)
+				inOpen = false
+			})
+			x.Set("abort", func() {
+				if inOpen {
+					return
+				}
+				abort.Call("call", x)
+			})
+			return x
+		})
 		return &http.XHRTransport{}
 	}(),
-	//Timeout: time.Second * 5,
+	Timeout: time.Second * 5,
 }
 
 func parse(src string) string {
