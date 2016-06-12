@@ -24,7 +24,7 @@ var nconf = js.Module.Get("parent").Call("require", "nconf")
 var lru = ccache.New(ccache.Configure())
 var client = &http.Client{
 	Transport: func() http.RoundTripper {
-		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xmlhttprequest"))
+		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xmlhttprequest").Get("XMLHttpRequest"))
 		return &http.XHRTransport{}
 	}(),
 	Timeout: time.Second * 5,
