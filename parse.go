@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"log"
 	"net/http"
 	"net/url"
@@ -24,29 +27,10 @@ var nconf = js.Module.Get("parent").Call("require", "nconf")
 var lru = ccache.New(ccache.Configure())
 var client = &http.Client{
 	Transport: func() http.RoundTripper {
-		xhr := js.Global.Call("require", "xmlhttprequest").Get("XMLHttpRequest")
-		js.Global.Set("XMLHttpRequest", func() *js.Object {
-			// https://github.com/driverdan/node-XMLHttpRequest/issues/125
-			x := xhr.New()
-			inOpen := false
-			open := x.Get("open")
-			abort := x.Get("abort")
-			x.Set("open", func(method, url, async, user, password *js.Object) {
-				inOpen = true
-				open.Call("call", x, method, url, async, user, password)
-				inOpen = false
-			})
-			x.Set("abort", func() {
-				if inOpen {
-					return
-				}
-				abort.Call("call", x)
-			})
-			return x
-		})
+		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xhr2"))
 		return &http.XHRTransport{}
 	}(),
-	Timeout: time.Second * 5,
+	//Timeout: time.Second * 5,
 }
 
 func parse(src string) string {
@@ -120,8 +104,7 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 			}
 			return nil, err
 		}
-		req.Header.Set("Accept", "image/*")
-		req.Header.Set("Range", "bytes=0-1023")
+		req.Header.Set("Accept", "image/*, */*;q=0.1")
 		req.Header.Set("User-Agent", "nodebb-plugin-image-size/0.0 (+https://github.com/BenLubar/nodebb-plugin-image-size)")
 		resp, err := client.Do(req)
 		if err != nil {

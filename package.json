@@ -20,6 +20,6 @@
     "compatibility": "^1.0.0"
   },
   "dependencies": {
-    "xmlhttprequest": "^1.8.0"
+    "xhr2": "^0.1.3"
   }
 }
