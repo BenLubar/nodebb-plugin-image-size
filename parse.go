@@ -30,7 +30,7 @@ var client = &http.Client{
 		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xhr2"))
 		return &http.XHRTransport{}
 	}(),
-	//Timeout: time.Second * 5,
+	Timeout: time.Second * 15,
 }
 
 func parse(src string) string {
