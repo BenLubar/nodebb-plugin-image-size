@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"image"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,9 +18,15 @@ import (
 	"golang.org/x/net/html"
 )
 
+const debug = false
+
 var nconf = js.Module.Get("parent").Call("require", "nconf")
 var lru = ccache.New(ccache.Configure())
 var client = &http.Client{
+	Transport: func() http.RoundTripper {
+		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xmlhttprequest"))
+		return &http.XHRTransport{}
+	}(),
 	Timeout: time.Second * 5,
 }
 
@@ -89,6 +96,9 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 	item, err := lru.Fetch(src, time.Minute*10, func() (interface{}, error) {
 		req, err := http.NewRequest("GET", src, nil)
 		if err != nil {
+			if debug {
+				log.Println("[nodebb-plugin-image-size]", src, err)
+			}
 			return nil, err
 		}
 		req.Header.Set("Accept", "image/*")
@@ -96,16 +106,25 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 		req.Header.Set("User-Agent", "nodebb-plugin-image-size/0.0 (+https://github.com/BenLubar/nodebb-plugin-image-size)")
 		resp, err := client.Do(req)
 		if err != nil {
+			if debug {
+				log.Println("[nodebb-plugin-image-size]", src, err)
+			}
 			return nil, err
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			if debug {
+				log.Println("[nodebb-plugin-image-size]", src, resp.Status)
+			}
 			return image.Config{}, nil
 		}
 
 		config, _, err := image.DecodeConfig(resp.Body)
 		if err != nil {
+			if debug {
+				log.Println("[nodebb-plugin-image-size]", src, err)
+			}
 			return image.Config{}, nil
 		}
 		return config, nil
