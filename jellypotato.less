@@ -1,0 +1,9 @@
+html [component="post/content"] img:not(.not-responsive):not([data-state]) {
+	display: inline !important;
+}
+
+html [component="post/content"] img[data-state="unloaded"],
+html [component="post/content"] img[data-state="loading"] {
+	width: auto;
+	height: auto;
+}

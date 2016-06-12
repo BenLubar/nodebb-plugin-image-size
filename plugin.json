@@ -8,5 +8,8 @@
 		{"hook": "filter:parse.post", "method": "parsePost", "priority": 15},
 		{"hook": "filter:parse.signature", "method": "parseSignature", "priority": 15},
 		{"hook": "filter:parse.aboutme", "method": "parseGeneric", "priority": 15}
+	],
+	"less": [
+		"./jellypotato.less"
 	]
 }
