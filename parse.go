@@ -14,8 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BenLubar/nodejs-roundtripper"
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/karlseguin/ccache"
+	_ "github.com/mat/besticon/ico"
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
 	"golang.org/x/net/html"
@@ -26,11 +28,8 @@ const debug = false
 var nconf = js.Module.Get("parent").Call("require", "nconf")
 var lru = ccache.New(ccache.Configure())
 var client = &http.Client{
-	Transport: func() http.RoundTripper {
-		js.Global.Set("XMLHttpRequest", js.Global.Call("require", "xhr2"))
-		return &http.XHRTransport{}
-	}(),
-	Timeout: time.Second * 15,
+	Transport: roundtripper.RoundTripper,
+	Timeout:   time.Second * 5,
 }
 
 func parse(src string) string {
@@ -90,8 +89,12 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 	if err != nil {
 		return
 	}
+	originalHost := u.Host
 	u, err = u.Parse(src)
 	if err != nil {
+		return
+	}
+	if u.Host == originalHost && strings.HasSuffix(u.Path, ".svg") {
 		return
 	}
 	src = u.String()
@@ -100,7 +103,7 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 		req, err := http.NewRequest("GET", src, nil)
 		if err != nil {
 			if debug {
-				log.Println("[nodebb-plugin-image-size]", src, err)
+				log.Println("[nodebb-plugin-image-size]", err)
 			}
 			return nil, err
 		}
@@ -109,7 +112,7 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 		resp, err := client.Do(req)
 		if err != nil {
 			if debug {
-				log.Println("[nodebb-plugin-image-size]", src, err)
+				log.Println("[nodebb-plugin-image-size]", err)
 			}
 			return nil, err
 		}
