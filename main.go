@@ -17,8 +17,8 @@ func post(fn func(string) string) func(data, callback *js.Object) {
 		go func() {
 			if data != nil && data.Get("postData") != nil && data.Get("postData").Get("content") != nil {
 				data.Get("postData").Set("content", fn(data.Get("postData").Get("content").String()))
-				callback.Invoke(nil, data)
 			}
+			callback.Invoke(nil, data)
 		}()
 	}
 }
@@ -28,8 +28,8 @@ func signature(fn func(string) string) func(data, callback *js.Object) {
 		go func() {
 			if data != nil && data.Get("userData") != nil && data.Get("userData").Get("signature") != nil {
 				data.Get("userData").Set("signature", fn(data.Get("userData").Get("signature").String()))
-				callback.Invoke(nil, data)
 			}
+			callback.Invoke(nil, data)
 		}()
 	}
 }

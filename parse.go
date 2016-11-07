@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	"net/http"
@@ -21,14 +22,13 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-const debug = false
+const debug = true
 
 var nconf = js.Module.Get("parent").Call("require", "nconf")
 var winston = js.Module.Get("parent").Call("require", "winston")
 var lru = ccache.New(ccache.Configure())
 var client = &http.Client{
 	Transport: roundtripper.RoundTripper,
-	Timeout:   time.Second * 15,
 }
 
 func parse(src string) string {
@@ -41,10 +41,13 @@ func parse(src string) string {
 		return src
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
 	var wg sync.WaitGroup
 	wg.Add(len(nodes))
 	for _, n := range nodes {
-		go parseNode(&wg, n)
+		go parseNode(ctx, &wg, n)
 	}
 	wg.Wait()
 
@@ -58,7 +61,7 @@ func parse(src string) string {
 	return buf.String()
 }
 
-func parseNode(wg *sync.WaitGroup, n *html.Node) {
+func parseNode(ctx context.Context, wg *sync.WaitGroup, n *html.Node) {
 	defer wg.Done()
 
 	for {
@@ -81,7 +84,7 @@ func parseNode(wg *sync.WaitGroup, n *html.Node) {
 			}
 			if err != nil {
 				wg.Add(1)
-				go setSize(wg, n, src)
+				go setSize(ctx, wg, n, src)
 			}
 		}
 
@@ -101,7 +104,7 @@ func parseNode(wg *sync.WaitGroup, n *html.Node) {
 	}
 }
 
-func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
+func setSize(ctx context.Context, wg *sync.WaitGroup, n *html.Node, src string) {
 	defer wg.Done()
 
 	u, err := url.Parse(nconf.Call("get", "url").String())
@@ -124,65 +127,86 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 	src = u.String()
 
 	item, err := lru.Fetch(src, time.Minute*10, func() (interface{}, error) {
-		if u.Host == originalHost {
-			if uploadURL := nconf.Call("get", "upload_url").String(); strings.HasPrefix(cleanPath, uploadURL) {
-				localPath := filepath.Join(nconf.Call("get", "base_dir").String(), nconf.Call("get", "upload_path").String(), strings.TrimPrefix(cleanPath, uploadURL))
-				f, err := os.Open(localPath)
-				if err != nil {
-					if debug {
-						winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] os.Open %q %v", localPath, err))
+		ch := make(chan image.Config, 1)
+		go func() {
+			if u.Host == originalHost {
+				if uploadURL := nconf.Call("get", "upload_url").String(); strings.HasPrefix(cleanPath, uploadURL) {
+					localPath := filepath.Join(nconf.Call("get", "base_dir").String(), nconf.Call("get", "upload_path").String(), strings.TrimPrefix(cleanPath, uploadURL))
+					f, err := os.Open(localPath)
+					if err != nil {
+						if debug {
+							winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] os.Open %q %v", localPath, err))
+						}
+						ch <- image.Config{}
+						return
 					}
-					return image.Config{}, nil
-				}
-				defer f.Close()
+					defer f.Close()
 
-				config, _, err := image.DecodeConfig(f)
-				if err != nil {
-					if debug {
-						winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] image.DecodeConfig %q %v", localPath, err))
+					config, _, err := image.DecodeConfig(f)
+					if err != nil {
+						if debug {
+							winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] image.DecodeConfig %q %v", localPath, err))
+						}
+						ch <- image.Config{}
+						return
 					}
-					return image.Config{}, nil
+					ch <- config
+					return
 				}
-				return config, nil
+				if strings.HasPrefix(cleanPath, originalPath) {
+					ch <- image.Config{}
+					return
+				}
 			}
-			if strings.HasPrefix(cleanPath, originalPath) {
-				return image.Config{}, nil
-			}
-		}
 
-		req, err := http.NewRequest("GET", src, nil)
-		if err != nil {
-			if debug {
-				winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] http.NewRequest %q %v", src, err))
+			req, err := http.NewRequest("GET", src, nil)
+			if err != nil {
+				if debug {
+					winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] http.NewRequest %q %v", src, err))
+				}
+				ch <- image.Config{}
+				return
 			}
-			return nil, err
-		}
-		req.Header.Set("Accept", "image/*")
-		req.Header.Set("User-Agent", "nodebb-plugin-image-size/0.0 (+https://github.com/BenLubar/nodebb-plugin-image-size)")
-		resp, err := client.Do(req)
-		if err != nil {
-			if debug {
-				winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] client.Do %q %v", src, err))
+			req = req.WithContext(ctx)
+			req.Header.Set("Accept", "image/*")
+			req.Header.Set("User-Agent", "nodebb-plugin-image-size/0.0 (+https://github.com/BenLubar/nodebb-plugin-image-size)")
+			resp, err := client.Do(req)
+			if err != nil {
+				if debug {
+					winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] client.Do %q %v", src, err))
+				}
+				ch <- image.Config{}
+				return
 			}
-			return nil, err
-		}
-		defer resp.Body.Close()
+			defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode != http.StatusOK {
+				if debug {
+					winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] response status %q %s", src, resp.Status))
+				}
+				ch <- image.Config{}
+				return
+			}
+
+			config, _, err := image.DecodeConfig(resp.Body)
+			if err != nil {
+				if debug {
+					winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] image.DecodeConfig %q %v", src, err))
+				}
+				ch <- image.Config{}
+				return
+			}
+			ch <- config
+		}()
+		select {
+		case config := <-ch:
+			return config, nil
+		case <-ctx.Done():
 			if debug {
-				winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] response status %q %s", src, resp.Status))
+				winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] timed out: %q", src))
 			}
 			return image.Config{}, nil
 		}
-
-		config, _, err := image.DecodeConfig(resp.Body)
-		if err != nil {
-			if debug {
-				winston.Call("warn", fmt.Sprintf("[nodebb-plugin-image-size] image.DecodeConfig %q %v", src, err))
-			}
-			return image.Config{}, nil
-		}
-		return config, nil
 	})
 	if err != nil {
 		// nothing we can do

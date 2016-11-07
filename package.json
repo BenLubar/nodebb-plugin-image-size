@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-image-size",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Adds height and width attributes to posted images.",
   "main": "nodebb-plugin-image-size.js",
   "scripts": {
