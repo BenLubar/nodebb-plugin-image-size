@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
-const debug = true
+const debug = false
 
 var nconf = js.Module.Get("parent").Call("require", "nconf")
 var winston = js.Module.Get("parent").Call("require", "winston")
@@ -115,6 +115,12 @@ func setSize(wg *sync.WaitGroup, n *html.Node, src string) {
 		return
 	}
 	cleanPath := path.Clean(u.Path)
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return
+	}
+	if strings.HasSuffix(u.Path, ".php") || strings.HasSuffix(u.Path, ".svg") {
+		return
+	}
 	src = u.String()
 
 	item, err := lru.Fetch(src, time.Minute*10, func() (interface{}, error) {

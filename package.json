@@ -1,6 +1,6 @@
 {
   "name": "nodebb-plugin-image-size",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Adds height and width attributes to posted images.",
   "main": "nodebb-plugin-image-size.js",
   "scripts": {
@@ -20,6 +20,6 @@
     "compatibility": "^1.0.0"
   },
   "dependencies": {
-    "syscall": "file:syscall"
+    "syscall": "git+https://github.com/BenLubar/nodebb-plugin-image-size.git#syscall"
   }
 }
